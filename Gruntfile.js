@@ -1,60 +1,50 @@
 'use strict';
-var markdown = require('marked');
-var semver = require('semver');
 
 module.exports = function (grunt) {
   require('load-grunt-tasks')(grunt);
 
   grunt.initConfig({
-    pkg: grunt.file.readJSON('package.json'),
+    pkg: require('package.json'),
+    jshint: {
+      all: {
+        src: [
+          '**/*.js',
+          '!test/**/*.js'
+        ]
+      }
+    },
+    bump: {
+      options: {
+        commit: false,
+        createTag: false,
+        push: false
+      }
+    },
     changelog: {
       options: {
-        dest: 'CHANGELOG.md',
-        versionFile: 'package.json'
+        dest: 'CHANGELOG.md'
       }
     },
     release: {
       options: {
-        commitMessage: '<%= version %>',
+        bump: false,
+        file: 'package.json',
         tagName: 'v<%= version %>',
-        bump: false, // we have our own bump
-        file: 'package.json'
-      }
-    },
-    stage: {
-      options: {
-        files: ['CHANGELOG.md']
+        commitMessage: 'chore(release): release v%VERSION%'
       }
     }
   });
 
-  grunt.registerTask('bump', 'bump manifest version', function (type) {
-    var options = this.options({
-      file: grunt.config('pkgFile') || 'package.json'
-    });
-
-    function setup(file, type) {
-      var pkg = grunt.file.readJSON(file);
-      var newVersion = pkg.version = semver.inc(pkg.version, type || 'patch');
-      return {
-        file: file,
-        pkg: pkg,
-        newVersion: newVersion
-      };
-    }
-
-    var config = setup(options.file, type);
-    grunt.file.write(config.file, JSON.stringify(config.pkg, null, '  ') + '\n');
-    grunt.log.ok('Version bumped to ' + config.newVersion);
+  grunt.registerTask('release', function() {
+    // See https://github.com/vojtajina/grunt-bump#usage for usage on what to
+    // use with `grunt release --type=patch`
+    var bump = grunt.option('type');
+    grunt.task.run([
+      'default',
+      'bump-only:'+bump,
+      'changelog',
+      'release'
+    ]);
   });
-
-  grunt.registerTask('stage', 'git add files before running the release task', function () {
-    var files = this.options().files;
-    grunt.util.spawn({
-      cmd: process.platform === 'win32' ? 'git.cmd' : 'git',
-      args: ['add'].concat(files)
-    }, grunt.task.current.async());
-  });
-
-  grunt.registerTask('default', ['bump', 'changelog', 'stage', 'release']);
+  grunt.registerTask('default', ['jshint']);
 };
